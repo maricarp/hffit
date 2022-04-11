@@ -84,7 +84,7 @@ def main():
     model = LinearModel(mu_x[:N], mu_y[:N], sigma_x[:N], sigma_y[:N])
     if 1:
         work = cpnest.CPNest(
-            model, verbose=2, nnest=4, nensemble=8, nlive=250, maxmcmc=5000)
+            model, verbose=2, nnest=2, nensemble=4, nlive=250, maxmcmc=5000)
         work.run()
         print("estimated logZ = {0} \ pm {1}".format(work.logZ, work.logZ_error))
         samples = work.posterior_samples
