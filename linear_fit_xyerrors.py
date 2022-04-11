@@ -41,7 +41,7 @@ class LinearModel(cpnest.model.Model):
         for i in range(len(self.mu_x)):
             x_i = p['x_{}'.format(i)]
             y_i = line(x_i, p['m'], p['c'])
-            L += 0.5 * ((y_i - self.mu_y[i]) / self.sigma_y)**2 + 0.5 * ((x_i - self.mu_x[i]) / self.sigma_x)**2
+            L += 0.5 * ((y_i - self.mu_y[i]) / self.sigma_y[i])**2 + 0.5 * ((x_i - self.mu_x[i]) / self.sigma_x[i])**2
         return -L
 
     def log_prior(self, p):
