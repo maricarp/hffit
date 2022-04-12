@@ -2,8 +2,10 @@ import numpy as np
 import cpnest.model
 import matplotlib.pyplot as plt
 
+
 def line(x, m, c):
     return m*x + c
+
 
 def normal_func(x, mu_k, sigma_k, K):
     N_func = 0
@@ -52,31 +54,33 @@ class LinearModel(cpnest.model.Model):
 #                logP += -0.5 * ((x_i - self.mu_x[i]) / self.sigma_x[i])**2
         return logP
 
+
 def plot_fit(p, mu_x, sigma_x, mu_y, sigma_y):
     fig = plt.figure()
-    ax  = fig.add_subplot(211)
+    ax = fig.add_subplot(211)
     ax.errorbar(mu_x, mu_y, xerr=sigma_x, yerr=sigma_y, linestyle=None, fmt='none')
     models = []
-    x = np.linspace(1,200,1000)
+    x = np.linspace(1, 200, 1000)
     for s in p:
         l = line(x, s['m'], s['c'])
         models.append(l)
     models = np.array(models)
-    ll,l,m,h,hh = np.percentile(models, [5,14,50,86,95], axis = 0)
-    ax.fill_between(x,ll,hh,facecolor='turquoise',alpha=0.25)
-    ax.fill_between(x,l,h,facecolor='turquoise',alpha=0.5)
-    ax.plot(x,m,linewidth=0.77,color='k')
-    ax.axhline(0,linestyle='dotted',linewidth=0.5)
+    ll, l, m, h, hh = np.percentile(models, [5, 14, 50, 86, 95], axis=0)
+    ax.fill_between(x, ll, hh, facecolor='turquoise', alpha=0.25)
+    ax.fill_between(x, l, h, facecolor='turquoise', alpha=0.5)
+    ax.plot(x, m, linewidth=0.77, color='k')
+    ax.axhline(0, linestyle='dotted', linewidth=0.5)
     ax.set_xlabel('$M_\odot$')
     ax.set_ylabel('$f(M_\odot)$')
-    ax.set_xlim([1,200])
+    ax.set_xlim([1, 200])
     ax2 = fig.add_subplot(212)
     for i in range(len(mu_x)):
         ax2.hist(p['x_{}'.format(i)], density=False, alpha=0.5)
     ax2.set_xlabel('$M_\odot$')
-    ax2.set_xlim([1,200])
-    plt.savefig('regression.pdf',bbox_inches='tight')
-    
+    ax2.set_xlim([1, 200])
+    plt.savefig('regression.pdf', bbox_inches='tight')
+
+
 def main():
     mu_x, sigma_x = np.loadtxt('mtot_statistics.txt', unpack=True)
     mu_y, sigma_y = np.loadtxt('dphi1_statistics.txt', unpack=True)
@@ -91,12 +95,13 @@ def main():
     else:
         import h5py
         filename = 'cpnest.h5'
-        h5_file = h5py.File(filename,'r')
+        h5_file = h5py.File(filename, 'r')
         samples = h5_file['combined'].get('posterior_samples')
         print("estimated logZ = {0} \ pm {1}".format(h5_file['combined'].get('logZ'),
                                                      h5_file['combined'].get('dlogZ')))
-    
-    plot_fit(samples,mu_x[:N], sigma_x[:N], mu_y[:N], sigma_y[:N])
+
+    plot_fit(samples, mu_x[:N], sigma_x[:N], mu_y[:N], sigma_y[:N])
+
 
 if __name__ == '__main__':
     main()
