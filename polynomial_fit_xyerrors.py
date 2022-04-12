@@ -43,9 +43,21 @@ class PolynomialModel(cpnest.model.Model):
         self.names      = []
         self.bounds     = []
         
-        for order in range(self.poly_order):
-            self.names.append('c_{}'.format(order))
-            self.bounds.append([-1,1])
+        # need to add assert checks to ensure the same length of all the input arrays
+        
+        if poly_order == -1:
+            self.independent = True
+            print("I am going to assume uncorrelated variables")
+            for i in range(len(self.mu_y)):
+                self.names.append('y_{}'.format(i))
+                self.bounds.append([self.mu_y[i]-5.0*self.sigma_y[i], self.mu_y[i]+5.0*self.sigma_y[i]])
+            print("I added {0} independent y variables".format(len(self.mu_y)))
+        else:
+            self.independent = False
+            print("I am going to assume a polynomial of order {0}".format(poly_order))
+            for order in range(self.poly_order):
+                self.names.append('c_{}'.format(order))
+                self.bounds.append([-1,1])
             
         for i in range(len(self.mu_x)):
             self.names.append('x_{}'.format(i))
@@ -57,12 +69,19 @@ class PolynomialModel(cpnest.model.Model):
         # w_k = 1.0 / self.K  # verranno passati in input come dati
         # corretta per K=1
         L = 0
-        coeffs = [p['c_{}'.format(i)] for i in range(self.poly_order)]
-        for i in range(len(self.mu_x)):
-            x_i = p['x_{}'.format(i)]
-            y_i = polynomial(x_i, coeffs)
-            L += -0.5 * ((y_i - self.mu_y[i]) / self.sigma_y[i])**2
-            L += -0.5 * ((x_i - self.mu_x[i]) / self.sigma_x[i])**2
+        if self.independent is not True:
+            coeffs = [p['c_{}'.format(i)] for i in range(self.poly_order)]
+            for i in range(len(self.mu_x)):
+                x_i = p['x_{}'.format(i)]
+                y_i = polynomial(x_i, coeffs)
+                L += -0.5 * ((y_i - self.mu_y[i]) / self.sigma_y[i])**2
+                L += -0.5 * ((x_i - self.mu_x[i]) / self.sigma_x[i])**2
+        else:
+            for i in range(len(self.mu_x)):
+                x_i = p['x_{}'.format(i)]
+                y_i = p['y_{}'.format(i)]
+                L += -0.5 * ((y_i - self.mu_y[i]) / self.sigma_y[i])**2
+                L += -0.5 * ((x_i - self.mu_x[i]) / self.sigma_x[i])**2
         return L
 
     def log_prior(self, p):
@@ -123,8 +142,8 @@ def main(options):
         samples = h5_file['combined'].get('posterior_samples')
         print("estimated logZ = {0} \ pm {1}".format(h5_file['combined'].get('logZ'),
                                                      h5_file['combined'].get('dlogZ')))
-
-    plot_fit(samples, model, output = options.output)
+    if model.independent is not True:
+        plot_fit(samples, model, output = options.output)
 
 
 if __name__ == '__main__':
