@@ -48,10 +48,6 @@ class LinearModel(cpnest.model.Model):
 
     def log_prior(self, p):
         logP = super(LinearModel, self).log_prior(p)
-#        if np.isfinite(logP):
-#            for i in range(len(self.mu_x)):
-#                x_i = p['x_{}'.format(i)]
-#                logP += -0.5 * ((x_i - self.mu_x[i]) / self.sigma_x[i])**2
         return logP
 
 
