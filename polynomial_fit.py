@@ -161,7 +161,6 @@ if __name__ == '__main__':
     parser.add_option('--y-data', default=None, type='str', help='txt file holding the y data information')
     parser.add_option('--poly-order', default=1, type='int', help='polynomial order for the fit')
     parser.add_option('--reciprocal', default=1, type='int', help='reciprocal function for 0-th order')
-
     parser.add_option('--output', default=None, type='str', help='output folder')
     parser.add_option('-p', default = False, action = 'store_true', help='post process only')
     parser.add_option('--nlive', default=1000, type='int', help='number of live points')
