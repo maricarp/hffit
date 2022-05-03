@@ -12,9 +12,6 @@ def polynomial(x, coeffs):
         ret += c*x**i
     return ret
 
-def line(x, m, c):
-    return m*x + c
-
 def normal_func(x, mu_k, sigma_k, K):
     N_func = 0
     for ik in range(K):
@@ -30,8 +27,9 @@ class PolynomialModel(cpnest.model.Model):
                  mu_y,
                  sigma_x,
                  sigma_y,
-                 reciprocal = 1, # sembra che mi prenda solo il valore che inserisco qui
+                 reciprocal = 1,
                  poly_order = 1,
+                 q = 1,
                  K=1):
 
         self.mu_x       = np.atleast_1d(mu_x)
@@ -40,6 +38,7 @@ class PolynomialModel(cpnest.model.Model):
         self.sigma_x    = np.atleast_1d(sigma_x)
         self.poly_order = poly_order+1 # the +1 is to be consistent with the requested order and the range call
         self.reciprocal = reciprocal
+        self.q = q
         self.names      = []
         self.bounds     = []
         self.K          = K
@@ -47,6 +46,10 @@ class PolynomialModel(cpnest.model.Model):
         if len(self.mu_x) is not len(self.mu_y):
             print("The input arrays are not the same lenght")
 
+        if q == 1:
+            print("I'm using mass ratio as x data")
+        else:
+            print("I'm using total mass as x data")
         if poly_order == -1:
             self.independent = True
             print("I am going to assume uncorrelated variables")
@@ -56,14 +59,13 @@ class PolynomialModel(cpnest.model.Model):
             print("I added {0} independent y variables".format(len(self.mu_y)))
         else:
             self.independent = False
-            for order in range(self.poly_order):
-                self.names.append('c_{}'.format(order))
-                self.bounds.append([-1,1])
             if reciprocal == 0:
                 print("I am going to assume a polynomial of order {0}".format(poly_order))
             else:
-                print("I am going to assume recirpocal function")
-
+                print("I am going to assume the recirpocal for x values")
+            for order in range(self.poly_order):
+                self.names.append('c_{}'.format(order))
+                self.bounds.append([-1,1])
         for i in range(len(self.mu_x)):
             self.names.append('x_{}'.format(i))
             self.bounds.append([self.mu_x[i]-5.0*self.sigma_x[i], self.mu_x[i]+5.0*self.sigma_x[i]])
@@ -103,7 +105,8 @@ def plot_fit(p, fitting_model, output = '.'):
                 yerr=fitting_model.sigma_y,
                 linestyle=None, fmt='none')
     models = []
-    x = np.linspace(1, 200, 1000)
+    # x = np.linspace(1, 200, 1000)
+    x = np.linspace(1, 10, 1000)
     for s in p:
         coeffs = [s['c_{}'.format(i)] for i in range(fitting_model.poly_order)]
         if fitting_model.reciprocal != 0:
@@ -117,21 +120,33 @@ def plot_fit(p, fitting_model, output = '.'):
     ax.fill_between(x, l, h, facecolor='turquoise', alpha=0.5)
     ax.plot(x, m, linewidth=0.77, color='k')
     ax.axhline(0, linestyle='dotted', linewidth=0.5)
-    ax.set_xlabel('$M_\odot$')
-    ax.set_ylabel('$f(M_\odot)$')
-    ax.set_xlim([1, 200])
+    if fitting_model.q == 0:
+        ax.set_xlabel('$M_\odot$')
+        ax.set_ylabel('$f(M_\odot)$')
+    else:
+        ax.set_xlabel('$q$')
+        ax.set_ylabel('$f(q)$')
+    # ax.set_xlim([1, 200])
+    ax.set_xlim([1, 10])
     ax2 = fig.add_subplot(212)
     for i in range(len(fitting_model.mu_x)):
         ax2.hist(p['x_{}'.format(i)], density=False, alpha=0.5)
-    ax2.set_xlabel('$M_\odot$')
-    ax2.set_xlim([1, 200])
+    if fitting_model.q == 0:
+        ax2.set_xlabel('$M_\odot$')
+    else:
+        ax2.set_xlabel('$q$')
+    # ax2.set_xlim([1, 200])
+    ax2.set_xlim([1, 10])
     plt.savefig(os.path.join(output,'regression.pdf'), bbox_inches='tight')
 
 def main(options):
     mu_x, sigma_x = np.loadtxt(options.x_data, unpack=True)
     mu_y, sigma_y = np.loadtxt(options.y_data, unpack=True)
     N = len(mu_x)
-    model = PolynomialModel(mu_x[:N], mu_y[:N], sigma_x[:N], sigma_y[:N], poly_order=options.poly_order)
+    model = PolynomialModel(mu_x[:N], mu_y[:N], sigma_x[:N], sigma_y[:N],
+                                                poly_order=options.poly_order,
+                                                reciprocal=options.reciprocal,
+                                                q=options.q)
     if options.p is False:
         work = cpnest.CPNest(model,
                              verbose    = 2,
@@ -161,6 +176,7 @@ if __name__ == '__main__':
     parser.add_option('--y-data', default=None, type='str', help='txt file holding the y data information')
     parser.add_option('--poly-order', default=1, type='int', help='polynomial order for the fit')
     parser.add_option('--reciprocal', default=1, type='int', help='reciprocal function for 0-th order')
+    parser.add_option('--q', default=0, type='int', help='other statistics for x data')
     parser.add_option('--output', default=None, type='str', help='output folder')
     parser.add_option('-p', default = False, action = 'store_true', help='post process only')
     parser.add_option('--nlive', default=1000, type='int', help='number of live points')
