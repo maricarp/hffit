@@ -37,6 +37,10 @@ def main(options):
         mix.add_new_point(s)
 
     rec = mix.build_mixture()
+    import pickle
+    with open('filename.p','wb') as f:
+        pickle.dump(rec, f)
+        
     mix.initialise()
 
     x = np.linspace(x_min, x_max, 1002)[1:-1]

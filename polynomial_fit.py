@@ -23,19 +23,23 @@ class PolynomialModel(cpnest.model.Model):
     Fit a polynomial through some points
     """
     def __init__(self,
-                 mu_x,
-                 mu_y,
-                 sigma_x,
-                 sigma_y,
+                 dps_x, # list of dpgmm for the independent variable
+                 dps_y, # list of dpgmm for the dependent variable
                  reciprocal = 1,
                  poly_order = 1,
+                 y_min = 1, # these values need to be fixed at runtime
+                 y_max = 100,
+                 x_min = 1, # these values need to be fixed at runtime
+                 x_max = 100,
                  q = 1,
                  K=1):
 
-        self.mu_x       = np.atleast_1d(mu_x)
-        self.mu_y       = np.atleast_1d(mu_y)
-        self.sigma_y    = np.atleast_1d(sigma_y)
-        self.sigma_x    = np.atleast_1d(sigma_x)
+        self.dps_x      = dps_x
+        self.dps_y      = dps_y
+        self.y_min      = y_min
+        self.y_max      = y_max
+        self.x_min      = x_min
+        self.x_max      = x_max
         self.poly_order = poly_order+1 # the +1 is to be consistent with the requested order and the range call
         self.reciprocal = reciprocal
         self.q = q
@@ -43,7 +47,7 @@ class PolynomialModel(cpnest.model.Model):
         self.bounds     = []
         self.K          = K
 
-        if len(self.mu_x) is not len(self.mu_y):
+        if len(self.dps_x) is not len(self.dps_y):
             print("The input arrays are not the same lenght")
 
         if q == 1:
@@ -53,10 +57,10 @@ class PolynomialModel(cpnest.model.Model):
         if poly_order == -1:
             self.independent = True
             print("I am going to assume uncorrelated variables")
-            for i in range(len(self.mu_y)):
+            for i in range(len(self.dps_y)):
                 self.names.append('y_{}'.format(i))
-                self.bounds.append([self.mu_y[i]-5.0*self.sigma_y[i], self.mu_y[i]+5.0*self.sigma_y[i]])
-            print("I added {0} independent y variables".format(len(self.mu_y)))
+                self.bounds.append([self.y_min, self.y_max])
+            print("I added {0} independent y variables".format(len(self.dps_y)))
         else:
             self.independent = False
             if reciprocal == 0:
@@ -66,9 +70,9 @@ class PolynomialModel(cpnest.model.Model):
             for order in range(self.poly_order):
                 self.names.append('c_{}'.format(order))
                 self.bounds.append([-1,1])
-        for i in range(len(self.mu_x)):
+        for i in range(len(self.dps_x)):
             self.names.append('x_{}'.format(i))
-            self.bounds.append([self.mu_x[i]-5.0*self.sigma_x[i], self.mu_x[i]+5.0*self.sigma_x[i]])
+            self.bounds.append([self.x_min, self.x_max])
 
     def log_likelihood(self, p):
         # w_k = 1.0 / self.K  # verranno passati in input come dati
@@ -76,20 +80,20 @@ class PolynomialModel(cpnest.model.Model):
         L = 0
         if self.independent is not True:
             coeffs = [p['c_{}'.format(i)] for i in range(self.poly_order)]
-            for i in range(len(self.mu_x)):
+            for i in range(len(self.dps_x)):
                 x_i = p['x_{}'.format(i)]
                 if self.reciprocal == 0:
                     y_i = polynomial(x_i, coeffs)
                 else:
                     y_i = polynomial(1/x_i, coeffs)
-                L += -0.5 * ((y_i - self.mu_y[i]) / self.sigma_y[i])**2
-                L += -0.5 * ((x_i - self.mu_x[i]) / self.sigma_x[i])**2
+                L += self.dps_x[i].logpdf(np.atleast_2d(x_i))
+                L += self.dps_y[i].logpdf(np.atleast_2d(y_i))
         else:
-            for i in range(len(self.mu_x)):
+            for i in range(len(self.dps_x)):
                 x_i = p['x_{}'.format(i)]
                 y_i = p['y_{}'.format(i)]
-                L += -0.5 * ((y_i - self.mu_y[i]) / self.sigma_y[i])**2
-                L += -0.5 * ((x_i - self.mu_x[i]) / self.sigma_x[i])**2
+                L += self.dps_x[i].logpdf(np.atleast_2d(x_i))
+                L += self.dps_y[i].logpdf(np.atleast_2d(y_i))
         return L
 
     def log_prior(self, p):
@@ -139,14 +143,32 @@ def plot_fit(p, fitting_model, output = '.'):
     ax2.set_xlim([1, 10])
     plt.savefig(os.path.join(output,'regression.pdf'), bbox_inches='tight')
 
+def read_figaro_files(folder, pname):
+    files = os.listdir(folder)
+    data = []
+    for f in files:
+        if 'dpgmm' in f and pname in f:
+            with open(f,'rb') as my_file:
+                data.append(pickle.load(my_file))
+    return data
+
 def main(options):
-    mu_x, sigma_x = np.loadtxt(options.x_data, unpack=True)
-    mu_y, sigma_y = np.loadtxt(options.y_data, unpack=True)
-    N = len(mu_x)
-    model = PolynomialModel(mu_x[:N], mu_y[:N], sigma_x[:N], sigma_y[:N],
-                                                poly_order=options.poly_order,
-                                                reciprocal=options.reciprocal,
-                                                q=options.q)
+    import os
+    import pickle
+    
+    xdata = read_figaro_files(options.x_data, options.x_parameter)
+    ydata = read_figaro_files(options.y_data, options.y_parameter)
+
+    N = len(xdata)
+    model = PolynomialModel(xdata[:N], ydata[:N],
+                            poly_order=options.poly_order,
+                            reciprocal=options.reciprocal,
+                            q=options.q,
+                            y_min = 1, # these values need to be fixed at runtime
+                            y_max = 100,
+                            x_min = 1, # these values need to be fixed at runtime
+                            x_max = 100)
+                            
     if options.p is False:
         work = cpnest.CPNest(model,
                              verbose    = 2,
@@ -172,8 +194,10 @@ def main(options):
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser()
-    parser.add_option('--x-data', default=None, type='str', help='txt file holding the x data information')
-    parser.add_option('--y-data', default=None, type='str', help='txt file holding the y data information')
+    parser.add_option('--x-data', default=None, type='str', help='folder containing the pickle files holding the x data dpgmm')
+    parser.add_option('--y-data', default=None, type='str', help='folder containing the pickle file holding the y data dpgmm')
+    parser.add_option('--x-parameter', default=None, type='str', help='parameter on the x axis')
+    parser.add_option('--y-parameter', default=None, type='str', help='parameter on the y axis')
     parser.add_option('--poly-order', default=1, type='int', help='polynomial order for the fit')
     parser.add_option('--reciprocal', default=1, type='int', help='reciprocal function for 0-th order')
     parser.add_option('--q', default=0, type='int', help='other statistics for x data')
