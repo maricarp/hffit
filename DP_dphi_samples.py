@@ -106,8 +106,8 @@ if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser()
     parser.add_option('--data', default=None, type='str', help='txt file holding the data information')
-    parser.add_option('--min', default=None, type='int', help='lower boundary')
-    parser.add_option('--max', default=None, type='int', help='upper boundary')
+    parser.add_option('--min', default=None, type='float', help='lower boundary')
+    parser.add_option('--max', default=None, type='float', help='upper boundary')
     parser.add_option('--output', default=None, type='str', help='output folder')
     parser.add_option('-p', default = False, action = 'store_true', help='post process only')
     (opts,args) = parser.parse_args()
