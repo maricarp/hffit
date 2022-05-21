@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from figaro.mixture import DPGMM
 import os
+import pickle
 
 from figaro.diagnostic import autocorrelation
 from figaro.utils import plot_median_cr
@@ -17,30 +18,29 @@ def main(options):
     output = options.output
     os.makedirs(output, exist_ok=True)
 
-    y, sd_y = np.loadtxt(options.y_data, unpack=True)
+    y = np.loadtxt(options.data, unpack=True)
     samples = y
     n_samps = len(y)
 
     mu = np.mean(y)
-    sigma = np.mean(sd_y)
+    sigma = np.std(y)
     dist = norm(mu, sigma)
 
     n, b, p = plt.hist(samples, bins = int(np.sqrt(len(samples))), histtype = 'step', density = True)
     plt.savefig(os.path.join(output,'hist.pdf'), bbox_inches='tight')
 
     # boundaries of the distribution
-    x_min = -2.5
-    x_max = 3
+    x_min = options.min
+    x_max = options.max
     mix = DPGMM([[x_min, x_max]])
 
     for s in tqdm(samples):  # progress bar of passing samples to the mixture
         mix.add_new_point(s)
 
     rec = mix.build_mixture()
-    import pickle
-    with open('filename.p','wb') as f:
+    with open('DP_list.p','wb') as f:
         pickle.dump(rec, f)
-        
+
     mix.initialise()
 
     x = np.linspace(x_min, x_max, 1002)[1:-1]
@@ -81,11 +81,11 @@ def main(options):
     plt.savefig(os.path.join(output,'comparison_cred_region.pdf'), bbox_inches='tight')
 
     # alternative method to obtain the plot
-    plot_median_cr(draws,
-                   injected = dist.pdf,
-                   samples  = samples,
-                   save     = False,
-                   )
+    #plot_median_cr(draws,
+                   #injected = dist.pdf,
+                   #samples  = samples,
+                   #save     = False,
+                   #)
 
     acf = autocorrelation(draws, bounds = [-0.6, 1], save = True, out_folder = output, show = True)
 
@@ -100,11 +100,14 @@ def main(options):
 
     ac = plot_angular_coefficient(S, L = 10, show = True, out_folder = output, save = True)
 
+
+
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser()
-    parser.add_option('--y-data', default=None, type='str', help='txt file holding the y data information')
-    parser.add_option('--poly-order', default=1, type='int', help='polynomial order for the fit')
+    parser.add_option('--data', default=None, type='str', help='txt file holding the data information')
+    parser.add_option('--min', default=None, type='int', help='lower boundary')
+    parser.add_option('--max', default=None, type='int', help='upper boundary')
     parser.add_option('--output', default=None, type='str', help='output folder')
     parser.add_option('-p', default = False, action = 'store_true', help='post process only')
     (opts,args) = parser.parse_args()
