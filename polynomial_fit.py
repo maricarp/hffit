@@ -12,12 +12,6 @@ def polynomial(x, coeffs):
         ret += c*x**i
     return ret
 
-def normal_func(x, mu_k, sigma_k, K):
-    N_func = 0
-    for ik in range(K):
-        N_func += 0.5 * ((x - mu_k[ik]) / sigma_k)**2
-    return N_func
-
 class PolynomialModel(cpnest.model.Model):
     """
     Fit a polynomial through some points
@@ -27,9 +21,9 @@ class PolynomialModel(cpnest.model.Model):
                  dps_y, # list of dpgmm for the dependent variable
                  reciprocal = 1,
                  poly_order = 1,
-                 y_min = 1, # these values need to be fixed at runtime
-                 y_max = 100,
-                 x_min = 1, # these values need to be fixed at runtime
+                 y_min = -10, # these values need to be fixed at runtime
+                 y_max = 10,
+                 x_min = -10, # these values need to be fixed at runtime
                  x_max = 100,
                  q = 1,
                  K=1):
@@ -155,7 +149,7 @@ def read_figaro_files(folder, pname):
 def main(options):
     import os
     import pickle
-    
+
     xdata = read_figaro_files(options.x_data, options.x_parameter)
     ydata = read_figaro_files(options.y_data, options.y_parameter)
 
@@ -164,11 +158,11 @@ def main(options):
                             poly_order=options.poly_order,
                             reciprocal=options.reciprocal,
                             q=options.q,
-                            y_min = 1, # these values need to be fixed at runtime
-                            y_max = 100,
-                            x_min = 1, # these values need to be fixed at runtime
-                            x_max = 100)
-                            
+                            y_min = options.y_min,
+                            y_max = options.y_max,
+                            x_min = options.x_min,
+                            x_max = options.x_max)
+
     if options.p is False:
         work = cpnest.CPNest(model,
                              verbose    = 2,
@@ -198,6 +192,10 @@ if __name__ == '__main__':
     parser.add_option('--y-data', default=None, type='str', help='folder containing the pickle file holding the y data dpgmm')
     parser.add_option('--x-parameter', default=None, type='str', help='parameter on the x axis')
     parser.add_option('--y-parameter', default=None, type='str', help='parameter on the y axis')
+    parser.add_option('--x_min', default=None, type='int', help='x lower boundary')
+    parser.add_option('--x_max', default=None, type='int', help='x upper boundary')
+    parser.add_option('--y_min', default=None, type='int', help='y lower boundary')
+    parser.add_option('--y_max', default=None, type='int', help='y upper boundary')
     parser.add_option('--poly-order', default=1, type='int', help='polynomial order for the fit')
     parser.add_option('--reciprocal', default=1, type='int', help='reciprocal function for 0-th order')
     parser.add_option('--q', default=0, type='int', help='other statistics for x data')
