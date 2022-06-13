@@ -16,7 +16,9 @@ infer a 1D probability density given a set of (posterior dphi) samples
 
 def main(options):
     output = options.output
+    p_file_output = options.output_p_file
     os.makedirs(output, exist_ok=True)
+    os.makedirs(p_file_output, exist_ok=True)
 
     y = np.loadtxt(options.data, unpack=True)
     samples = y
@@ -38,7 +40,9 @@ def main(options):
         mix.add_new_point(s)
 
     rec = mix.build_mixture()
-    with open('DP_list.p','wb') as f:
+    file_name = os.path.join(p_file_output, "dpgmm_" + options.parameter + ".p")
+    os.makedirs(output, exist_ok = True)
+    with open(file_name, 'wb') as f:
         pickle.dump(rec, f)
 
     mix.initialise()
@@ -80,14 +84,9 @@ def main(options):
     plt.grid(alpha = 0.6)
     plt.savefig(os.path.join(output,'comparison_cred_region.pdf'), bbox_inches='tight')
 
-    # alternative method to obtain the plot
-    #plot_median_cr(draws,
-                   #injected = dist.pdf,
-                   #samples  = samples,
-                   #save     = False,
-                   #)
-
-    acf = autocorrelation(draws, bounds = [-0.6, 1], save = True, out_folder = output, show = True)
+    acf_min = options.acf_min
+    acf_max = options.acf_max
+    acf = autocorrelation(draws, bounds = [acf_min, acf_max], save = True, out_folder = output, show = False)
 
     mix.initialise()
     updated_mixture = []
@@ -96,19 +95,22 @@ def main(options):
         mix.add_new_point(s)
         updated_mixture.append(mix.build_mixture())
 
-    S = entropy(updated_mixture, show = True, save = True, out_folder = output)
+    S = entropy(updated_mixture, show = False, save = True, out_folder = output)
 
-    ac = plot_angular_coefficient(S, L = 10, show = True, out_folder = output, save = True)
-
+    ac = plot_angular_coefficient(S, L = 10, show = False, out_folder = output, save = True)
 
 
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser()
     parser.add_option('--data', default=None, type='str', help='txt file holding the data information')
+    parser.add_option('--parameter', default=None, type='str', help='data parameter')
     parser.add_option('--min', default=None, type='float', help='lower boundary')
     parser.add_option('--max', default=None, type='float', help='upper boundary')
+    parser.add_option('--acf-min', default=None, type='float', help='acf lower bound')
+    parser.add_option('--acf-max', default=None, type='float', help='acf upper bound')
     parser.add_option('--output', default=None, type='str', help='output folder')
+    parser.add_option('--output-p-file', default=None, type='str', help='output folder for pickle') # use event name
     parser.add_option('-p', default = False, action = 'store_true', help='post process only')
     (opts,args) = parser.parse_args()
     main(opts)
