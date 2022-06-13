@@ -2,6 +2,7 @@ import os
 import numpy as np
 import cpnest.model
 import matplotlib.pyplot as plt
+import pickle
 
 def polynomial(x, coeffs):
     """
@@ -21,10 +22,10 @@ class PolynomialModel(cpnest.model.Model):
                  dps_y, # list of dpgmm for the dependent variable
                  reciprocal = 1,
                  poly_order = 1,
-                 y_min = -10, # these values need to be fixed at runtime
+                 y_min = -10,
                  y_max = 10,
-                 x_min = -10, # these values need to be fixed at runtime
-                 x_max = 100,
+                 x_min = 0,
+                 x_max = 200,
                  q = 1,
                  K=1):
 
@@ -69,8 +70,6 @@ class PolynomialModel(cpnest.model.Model):
             self.bounds.append([self.x_min, self.x_max])
 
     def log_likelihood(self, p):
-        # w_k = 1.0 / self.K  # verranno passati in input come dati
-        # corretta per K=1
         L = 0
         if self.independent is not True:
             coeffs = [p['c_{}'.format(i)] for i in range(self.poly_order)]
@@ -98,9 +97,7 @@ class PolynomialModel(cpnest.model.Model):
 def plot_fit(p, fitting_model, output = '.'):
     fig = plt.figure()
     ax = fig.add_subplot(211)
-    ax.errorbar(fitting_model.mu_x, fitting_model.mu_y,
-                xerr=fitting_model.sigma_x,
-                yerr=fitting_model.sigma_y,
+    ax.errorbar(fitting_model.dps_x, fitting_model.dps_y,
                 linestyle=None, fmt='none')
     models = []
     # x = np.linspace(1, 200, 1000)
@@ -127,7 +124,7 @@ def plot_fit(p, fitting_model, output = '.'):
     # ax.set_xlim([1, 200])
     ax.set_xlim([1, 10])
     ax2 = fig.add_subplot(212)
-    for i in range(len(fitting_model.mu_x)):
+    for i in range(len(fitting_model.dps_x)):
         ax2.hist(p['x_{}'.format(i)], density=False, alpha=0.5)
     if fitting_model.q == 0:
         ax2.set_xlabel('$M_\odot$')
@@ -137,21 +134,21 @@ def plot_fit(p, fitting_model, output = '.'):
     ax2.set_xlim([1, 10])
     plt.savefig(os.path.join(output,'regression.pdf'), bbox_inches='tight')
 
-def read_figaro_files(folder, pname):
-    files = os.listdir(folder)
+def read_figaro_files(events_list, pname):
+    events_list = events_list.split(',')
     data = []
-    for f in files:
-        if 'dpgmm' in f and pname in f:
-            with open(f,'rb') as my_file:
-                data.append(pickle.load(my_file))
+    for e in events_list:
+        name = "dpgmm_" + pname + "_" + e + ".p"
+        with open(os.path.join(e, name), 'rb') as my_file:
+            data.append(pickle.load(my_file))
     return data
 
 def main(options):
     import os
     import pickle
 
-    xdata = read_figaro_files(options.x_data, options.x_parameter)
-    ydata = read_figaro_files(options.y_data, options.y_parameter)
+    xdata = read_figaro_files(options.events_list, options.x_parameter)
+    ydata = read_figaro_files(options.events_list, options.y_parameter)
 
     N = len(xdata)
     model = PolynomialModel(xdata[:N], ydata[:N],
@@ -188,14 +185,13 @@ def main(options):
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser()
-    parser.add_option('--x-data', default=None, type='str', help='folder containing the pickle files holding the x data dpgmm')
-    parser.add_option('--y-data', default=None, type='str', help='folder containing the pickle file holding the y data dpgmm')
+    parser.add_option('--events-list', default=None, type='str', help='events list')
     parser.add_option('--x-parameter', default=None, type='str', help='parameter on the x axis')
     parser.add_option('--y-parameter', default=None, type='str', help='parameter on the y axis')
     parser.add_option('--x-min', default=None, type='float', help='x lower boundary')
     parser.add_option('--x-max', default=None, type='float', help='x upper boundary')
-    parser.add_option('--y-min', default=None, type='float', help='y lower boundary')
-    parser.add_option('--y-max', default=None, type='float', help='y upper boundary')
+    parser.add_option('--y-min', default=None, type='str', help='y lower boundary')
+    parser.add_option('--y-max', default=None, type='str', help='y upper boundary')
     parser.add_option('--poly-order', default=1, type='int', help='polynomial order for the fit')
     parser.add_option('--reciprocal', default=1, type='int', help='reciprocal function for 0-th order')
     parser.add_option('--q', default=0, type='int', help='other statistics for x data')
