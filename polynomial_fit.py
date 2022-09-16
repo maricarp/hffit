@@ -20,41 +20,36 @@ class PolynomialModel(cpnest.model.Model):
     def __init__(self,
                  dps_x, # list of dpgmm for the independent variable
                  dps_y, # list of dpgmm for the dependent variable
+                 x_parameter,
+                 y_parameter,
                  reciprocal = 1,
                  poly_order = 1,
-                 y_min = -10,
-                 y_max = 10,
-                 x_min = 0,
-                 x_max = 200,
                  q = 1,
-                 K=1):
+                 K = 1):
 
-        self.dps_x      = dps_x
-        self.dps_y      = dps_y
-        self.y_min      = y_min
-        self.y_max      = y_max
-        self.x_min      = x_min
-        self.x_max      = x_max
-        self.poly_order = poly_order+1 # the +1 is to be consistent with the requested order and the range call
-        self.reciprocal = reciprocal
-        self.q = q
-        self.names      = []
-        self.bounds     = []
-        self.K          = K
+        self.dps_x       = dps_x
+        self.dps_y       = dps_y
+        self.poly_order  = poly_order+1 # the +1 is to be consistent with the requested order and the range call
+        self.reciprocal  = reciprocal
+        self.q           = q
+        self.names       = []
+        self.bounds      = []
+        self.K           = K
+        self.x_parameter = x_parameter
+        self.y_parameter = y_parameter
 
         if len(self.dps_x) is not len(self.dps_y):
             print("The input arrays are not the same lenght")
 
-        if q == 1:
-            print("I'm using mass ratio as x data")
-        else:
-            print("I'm using total mass as x data")
+        print("I'm using " + self.x_parameter + " as x parameter")
         if poly_order == -1:
             self.independent = True
             print("I am going to assume uncorrelated variables")
             for i in range(len(self.dps_y)):
+                #if i == 14:
+                #    continue
                 self.names.append('y_{}'.format(i))
-                self.bounds.append([self.y_min, self.y_max])
+                self.bounds.append(self.dps_y[i].bounds[0])
             print("I added {0} independent y variables".format(len(self.dps_y)))
         else:
             self.independent = False
@@ -66,33 +61,53 @@ class PolynomialModel(cpnest.model.Model):
                 self.names.append('c_{}'.format(order))
                 self.bounds.append([-1,1])
         for i in range(len(self.dps_x)):
+            #if i == 14:
+            #    continue
             self.names.append('x_{}'.format(i))
-            self.bounds.append([self.x_min, self.x_max])
+            self.bounds.append(self.dps_x[i].bounds[0])
 
     def log_likelihood(self, p):
         L = 0
-        if self.independent is not True:
-            coeffs = [p['c_{}'.format(i)] for i in range(self.poly_order)]
-            for i in range(len(self.dps_x)):
-                x_i = p['x_{}'.format(i)]
-                if self.reciprocal == 0:
-                    y_i = polynomial(x_i, coeffs)
-                else:
-                    y_i = polynomial(1/x_i, coeffs)
-                L += self.dps_x[i].logpdf(np.atleast_2d(x_i))
-                L += self.dps_y[i].logpdf(np.atleast_2d(y_i))
-        else:
-            for i in range(len(self.dps_x)):
-                x_i = p['x_{}'.format(i)]
-                y_i = p['y_{}'.format(i)]
-                L += self.dps_x[i].logpdf(np.atleast_2d(x_i))
-                L += self.dps_y[i].logpdf(np.atleast_2d(y_i))
+        for i in range(len(self.dps_x)):
+            #if i == 14:
+            #    continue
+            x_i = p['x_{}'.format(i)]
+            L += self.dps_x[i].logpdf(np.atleast_2d(x_i))
+            L += self.dps_y[i].logpdf(np.atleast_2d(self.y[i]))
         return L
 
     def log_prior(self, p):
         logP = super(PolynomialModel, self).log_prior(p)
+        if not (np.isfinite(logP)):
+            return -np.inf
+        self.y = []
+        if self.independent is not True:
+            coeffs = [p['c_{}'.format(i)] for i in range(self.poly_order)]
+            for i in range(len(self.dps_x)):
+                #if i == 14:
+                #    self.y.append(0)
+                #    continue
+                x_i = p['x_{}'.format(i)]
+                if self.reciprocal == 0:
+                    self.y.append(polynomial(x_i, coeffs))
+                else:
+                    self.y.append(polynomial(1/x_i, coeffs))
+                if self.y[-1] > self.dps_y[i].bounds[0][1] or self.y[-1] < self.dps_y[i].bounds[0][0]:
+                    return -np.inf
+        else:
+            for i in range(len(self.dps_x)):
+                #if i == 14:
+                #    self.y.append(0)
+                #    continue
+                self.y.append(p['y_{}'.format(i)])
         return logP
 
+def twod_kde(x,y):
+    X, Y = np.mgrid[x.min()*0.9:x.max()*1.1:100j, y.min()*0.9:y.max()*1.1:100j]
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    values = np.vstack([x, y])
+    kernel = gaussian_kde(values)
+    return X, Y, np.reshape(kernel(positions).T, X.shape)
 
 def plot_fit(p, fitting_model, output = '.'):
     fig = plt.figure()
@@ -100,8 +115,12 @@ def plot_fit(p, fitting_model, output = '.'):
     ax.errorbar(fitting_model.dps_x, fitting_model.dps_y,
                 linestyle=None, fmt='none')
     models = []
-    # x = np.linspace(1, 200, 1000)
-    x = np.linspace(1, 10, 1000)
+    if fitting_model.q == 0:
+        x = np.linspace(1, 200, 1000)
+    elif "inverted" in fitting_model.x_parameter:
+        x = np.linspace(0.1, 10, 1000)
+    else:
+        x = np.linspace(0.1, 1.5, 1000)
     for s in p:
         coeffs = [s['c_{}'.format(i)] for i in range(fitting_model.poly_order)]
         if fitting_model.reciprocal != 0:
@@ -115,24 +134,50 @@ def plot_fit(p, fitting_model, output = '.'):
     ax.fill_between(x, l, h, facecolor='turquoise', alpha=0.5)
     ax.plot(x, m, linewidth=0.77, color='k')
     ax.axhline(0, linestyle='dotted', linewidth=0.5)
+    x = []
+    y = []
+    xerr = []
+    yerr = []
+    for i in range(len(fitting_model.dps_x)):
+        #if i == 14:
+        #    continue
+        x.append(np.median(p['x_{}'.format(i)]))
+        xerr.append(np.std(p['x_{}'.format(i)]))
+        ys = fitting_model.dps_y[i].rvs(100)
+        y.append(np.median(ys))
+        yerr.append(np.std(ys))
+    xmin = np.amin(xerr)
+    ymin = np.amin(yerr)
+    # print(xerr.index(xmin), xmin, yerr.index(ymin), ymin)
+    ax.errorbar(x, y, xerr=xerr, yerr=yerr, linestyle=None, fmt=".k")
+
     if fitting_model.q == 0:
-        ax.set_xlabel('$M_\odot$')
-        ax.set_ylabel('$f(M_\odot)$')
+        #ax.set_xlabel('$M$')
+        ax.set_ylabel('$f(M)$')
+        ax.set_xlim([1, 200])
     else:
-        ax.set_xlabel('$q$')
+        #ax.set_xlabel('$q$')
         ax.set_ylabel('$f(q)$')
-    # ax.set_xlim([1, 200])
-    ax.set_xlim([1, 10])
+        if "inverted" in fitting_model.x_parameter:
+            ax.set_xlim([0.1, 10])
+        else:
+            ax.set_xlim([0.1, 1.5])
     ax2 = fig.add_subplot(212)
     for i in range(len(fitting_model.dps_x)):
+        #if i == 14:
+        #    continue
         ax2.hist(p['x_{}'.format(i)], density=False, alpha=0.5)
     if fitting_model.q == 0:
-        ax2.set_xlabel('$M_\odot$')
+        ax2.set_xlabel('$M$')
+        ax2.set_xlim([1, 200])
     else:
         ax2.set_xlabel('$q$')
-    # ax2.set_xlim([1, 200])
-    ax2.set_xlim([1, 10])
-    plt.savefig(os.path.join(output,'regression.pdf'), bbox_inches='tight')
+        if "inverted" in fitting_model.x_parameter:
+            ax2.set_xlim([0.1, 10])
+        else:
+            ax2.set_xlim([0.1, 1.5])
+    plt_title = fitting_model.y_parameter + '_' + fitting_model.x_parameter + '.pdf'
+    plt.savefig(os.path.join(output,plt_title), bbox_inches='tight')
 
 def read_figaro_files(events_list, pname):
     events_list = events_list.split(',')
@@ -144,21 +189,16 @@ def read_figaro_files(events_list, pname):
     return data
 
 def main(options):
-    import os
-    import pickle
-
     xdata = read_figaro_files(options.events_list, options.x_parameter)
     ydata = read_figaro_files(options.events_list, options.y_parameter)
 
     N = len(xdata)
     model = PolynomialModel(xdata[:N], ydata[:N],
+                            x_parameter=options.x_parameter,
+                            y_parameter=options.y_parameter,
                             poly_order=options.poly_order,
                             reciprocal=options.reciprocal,
-                            q=options.q,
-                            y_min = options.y_min,
-                            y_max = options.y_max,
-                            x_min = options.x_min,
-                            x_max = options.x_max)
+                            q=options.q)
 
     if options.p is False:
         work = cpnest.CPNest(model,
@@ -188,10 +228,6 @@ if __name__ == '__main__':
     parser.add_option('--events-list', default=None, type='str', help='events list')
     parser.add_option('--x-parameter', default=None, type='str', help='parameter on the x axis')
     parser.add_option('--y-parameter', default=None, type='str', help='parameter on the y axis')
-    parser.add_option('--x-min', default=None, type='float', help='x lower boundary')
-    parser.add_option('--x-max', default=None, type='float', help='x upper boundary')
-    parser.add_option('--y-min', default=None, type='str', help='y lower boundary')
-    parser.add_option('--y-max', default=None, type='str', help='y upper boundary')
     parser.add_option('--poly-order', default=1, type='int', help='polynomial order for the fit')
     parser.add_option('--reciprocal', default=1, type='int', help='reciprocal function for 0-th order')
     parser.add_option('--q', default=0, type='int', help='other statistics for x data')
