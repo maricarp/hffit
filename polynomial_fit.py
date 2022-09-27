@@ -72,8 +72,8 @@ class PolynomialModel(cpnest.model.Model):
             #if i == 14:
             #    continue
             x_i = p['x_{}'.format(i)]
-            L += self.dps_x[i].logpdf(np.atleast_2d(x_i))
-            L += self.dps_y[i].logpdf(np.atleast_2d(self.y[i]))
+            L += self.dps_x[i].fast_logpdf(np.atleast_2d(x_i))
+            L += self.dps_y[i].fast_logpdf(np.atleast_2d(self.y[i]))
         return L
 
     def log_prior(self, p):
