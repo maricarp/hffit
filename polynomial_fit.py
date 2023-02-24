@@ -59,7 +59,7 @@ class PolynomialModel(cpnest.model.Model):
                 print("I am going to assume the recirpocal for x values")
             for order in range(self.poly_order):
                 self.names.append('c_{}'.format(order))
-                self.bounds.append([-1,1])
+                self.bounds.append([-1,10])
         for i in range(len(self.dps_x)):
             #if i == 14:
             #    continue
@@ -116,9 +116,17 @@ def plot_fit(p, fitting_model, output = '.'):
                 linestyle=None, fmt='none')
     models = []
     if fitting_model.q == 0:
-        x = np.linspace(1, 200, 1000)
+        #x = np.linspace(1, 200, 1000)
+        if 'A_alpha' in fitting_model.y_parameter:
+            x = np.linspace(1, 100, 1000)
+        else:
+            x = np.linspace(1, 200, 1000)
     elif "inverted" in fitting_model.x_parameter:
-        x = np.linspace(0.1, 10, 1000)
+        #x = np.linspace(0.1, 10, 1000)
+        if 'A_alpha' in fitting_model.y_parameter:
+            x = np.linspace(0.5, 2.5, 1000)
+        else:
+            x = np.linspace(0.1, 10, 1000)
     else:
         x = np.linspace(0.1, 1.5, 1000)
     for s in p:
@@ -154,12 +162,20 @@ def plot_fit(p, fitting_model, output = '.'):
     if fitting_model.q == 0:
         #ax.set_xlabel('$M$')
         ax.set_ylabel('$f(M)$')
-        ax.set_xlim([1, 200])
+        #ax.set_xlim([1, 200])
+        if 'A_alpha' in fitting_model.y_parameter:
+            ax.set_xlim([1, 100])
+        else:
+            ax.set_xlim([1, 200])
     else:
         #ax.set_xlabel('$q$')
         ax.set_ylabel('$f(q)$')
         if "inverted" in fitting_model.x_parameter:
-            ax.set_xlim([0.1, 10])
+            #ax.set_xlim([0.1, 10])
+            if 'A_alpha' in fitting_model.y_parameter:
+                ax.set_xlim([0.5, 2.5])
+            else:
+                ax.set_xlim([0.1, 10])
         else:
             ax.set_xlim([0.1, 1.5])
     ax2 = fig.add_subplot(212)
@@ -167,13 +183,22 @@ def plot_fit(p, fitting_model, output = '.'):
         #if i == 14:
         #    continue
         ax2.hist(p['x_{}'.format(i)], density=False, alpha=0.5)
+
     if fitting_model.q == 0:
         ax2.set_xlabel('$M$')
-        ax2.set_xlim([1, 200])
+        #ax2.set_xlim([1, 200])
+        if 'A_alpha' in fitting_model.y_parameter:
+            ax2.set_xlim([1, 100])
+        else:
+            ax2.set_xlim([1, 200])
     else:
         ax2.set_xlabel('$q$')
         if "inverted" in fitting_model.x_parameter:
-            ax2.set_xlim([0.1, 10])
+            #ax2.set_xlim([0.1, 10])
+            if 'A_alpha' in fitting_model.y_parameter:
+                ax2.set_xlim([0.5, 2.5])
+            else:
+                ax2.set_xlim([0.1, 10])
         else:
             ax2.set_xlim([0.1, 1.5])
     plt_title = fitting_model.y_parameter + '_' + fitting_model.x_parameter + '.pdf'
@@ -188,9 +213,15 @@ def read_figaro_files(events_list, pname):
             data.append(pickle.load(my_file))
     return data
 
+
 def main(options):
-    xdata = read_figaro_files(options.events_list, options.x_parameter)
-    ydata = read_figaro_files(options.events_list, options.y_parameter)
+    if 'A_alpha' in options.y_parameter:
+        x_param = options.y_parameter + "_" + options.x_parameter
+    else:
+        x_param = options.x_parameter
+    y_param = options.y_parameter
+    xdata = read_figaro_files(options.events_list, x_param)
+    ydata = read_figaro_files(options.events_list, y_param)
 
     N = len(xdata)
     model = PolynomialModel(xdata[:N], ydata[:N],
@@ -225,7 +256,7 @@ def main(options):
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser()
-    parser.add_option('--events-list', default=None, type='str', help='events list')
+    parser.add_option('--events-list', default=None, type='str', help='events list - folders names')
     parser.add_option('--x-parameter', default=None, type='str', help='parameter on the x axis')
     parser.add_option('--y-parameter', default=None, type='str', help='parameter on the y axis')
     parser.add_option('--poly-order', default=1, type='int', help='polynomial order for the fit')
